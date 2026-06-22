@@ -1,0 +1,28 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyTorch models / weight checkpoints
+model_zoo/
+*.pth
+*.pt
+
+# Execution results & temporary paths
+trajectory_results/
+DIV2K_valid_HR/
+DIV2K_valid_HR.zip
+eval_results/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# IDE configurations
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp

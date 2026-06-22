@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kernel-Adaptive-HQS — How Blur Kernels Shape Optimal HQS Trajectories</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0c11; --bg2:#0d1016; --surf:#11151d; --surf2:#151a23;
+    --line:#232b38; --line2:#2d3744;
+    --tx:#e8eef6; --mut:#8d99a8; --mut2:#6a7686;
+    --e1:#ff5a32; --e2:#ff9d2f; --e3:#ffd24a;     /* ember, from the kernel hot-colormap */
+    --cy:#57d1e6;                                   /* sigma cool accent */
+    --r:14px;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --disp:'Space Grotesk',sans-serif;
+    --body:'Inter',sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:
+      radial-gradient(900px 480px at 82% -8%, rgba(255,90,50,.10), transparent 60%),
+      radial-gradient(700px 420px at 8% 4%, rgba(87,209,230,.06), transparent 60%),
+      var(--bg);
+    color:var(--tx);font-family:var(--body);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:980px;margin:0 auto;padding:0 20px}
+
+  /* ---- top bar (github chrome) ---- */
+  .top{position:sticky;top:0;z-index:30;background:rgba(10,12,17,.82);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .top .wrap{display:flex;align-items:center;gap:12px;height:56px}
+  .mark{width:26px;height:26px;flex:0 0 auto}
+  .repo{font-family:var(--mono);font-size:14.5px;letter-spacing:-.2px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .repo b{color:var(--tx);font-weight:700}
+  .repo .sl{color:var(--mut2);margin:0 4px}
+  .spacer{flex:1}
+  .pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line2);background:var(--surf2);
+    padding:6px 11px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--tx);transition:.15s}
+  .pill:hover{border-color:#3a4655;background:#1a212c}
+  .pill .ct{color:var(--mut);font-family:var(--mono);font-weight:500;padding-left:8px;margin-left:2px;border-left:1px solid var(--line2)}
+  .star{font-size:13px}
+
+  /* ---- repo header ---- */
+  .rhead{padding:30px 0 0}
+  .rhead h1.path{font-family:var(--mono);font-size:19px;font-weight:500;color:var(--mut);margin:0 0 10px;letter-spacing:-.3px}
+  .rhead h1.path b{color:var(--tx);font-weight:700}
+  .desc{font-size:15.5px;color:var(--mut);max-width:70ch;margin:0 0 16px}
+  .topics{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px}
+  .topic{font-size:12px;font-weight:600;color:#cfe0ff;background:rgba(87,140,230,.10);border:1px solid rgba(87,140,230,.28);
+    padding:3px 11px;border-radius:999px}
+  .badges{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px}
+  .badge{font-family:var(--mono);font-size:11px;font-weight:500;display:inline-flex;border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+  .badge span{padding:3px 8px}
+  .badge .k{background:#0f1219;color:var(--mut)}
+  .badge .v{background:#1c232e;color:var(--tx)}
+  .badge .v.em{background:linear-gradient(90deg,var(--e1),var(--e2));color:#1a0f08;font-weight:700}
+
+  /* ---- tabs ---- */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-top:6px;overflow-x:auto}
+  .tab{padding:9px 14px;font-size:13.5px;font-weight:600;color:var(--mut);border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+  .tab:hover{color:var(--tx)}
+  .tab.on{color:var(--tx);border-bottom-color:var(--e1)}
+  .tab .n{font-family:var(--mono);font-size:11px;color:var(--mut2);margin-left:7px;background:var(--surf2);border-radius:999px;padding:1px 7px}
+
+  /* ---- readme card ---- */
+  .readme{border:1px solid var(--line);border-radius:var(--r);background:var(--surf);margin:22px 0 60px;overflow:hidden}
+  .readme-bar{display:flex;align-items:center;gap:10px;padding:11px 18px;border-bottom:1px solid var(--line);background:var(--bg2);
+    font-size:13px;color:var(--mut);font-weight:600}
+  .readme-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--e2)}
+  .readme-body{padding:38px 34px}
+  @media(max-width:640px){.readme-body{padding:26px 18px}}
+
+  /* ---- hero ---- */
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--e2);margin:0 0 14px}
+  h2.title{font-family:var(--disp);font-weight:700;font-size:clamp(27px,4.4vw,40px);line-height:1.08;letter-spacing:-1px;margin:0 0 18px;
+    background:linear-gradient(180deg,#fff,#c7d2df);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .authors{font-size:15.5px;color:var(--tx);font-weight:500;margin:0 0 4px}
+  .authors b{font-weight:600}
+  .after{font-size:13.5px;color:var(--mut);margin:0 0 22px}
+  .affil .venue{color:var(--e2);font-weight:600;font-family:var(--mono);font-size:12.5px}
+
+  .cta{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 30px}
+  .btn{display:inline-flex;align-items:center;gap:9px;padding:10px 16px;border-radius:9px;font-size:14px;font-weight:600;
+    border:1px solid var(--line2);background:var(--surf2);transition:.16s;color:var(--tx)}
+  .btn svg{width:16px;height:16px}
+  .btn:hover{transform:translateY(-1px);border-color:#42505f;background:#1a212c}
+  .btn:focus-visible{outline:2px solid var(--e2);outline-offset:2px}
+  .btn.prime{border:none;background:linear-gradient(120deg,var(--e1),var(--e2));color:#1a0f08}
+  .btn.prime:hover{filter:brightness(1.06)}
+
+  /* ---- trajectory hero figure ---- */
+  .fig{border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,#0c0f15,#0a0c11);padding:18px 18px 12px;margin:6px 0 4px}
+  .fig svg{width:100%;height:auto;display:block}
+  .fig .leg{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--mut);font-family:var(--mono);margin-top:6px;padding-left:4px}
+  .fig .leg i{display:inline-block;width:18px;height:0;border-top-width:2.5px;border-top-style:solid;vertical-align:middle;margin-right:7px}
+  .figcap{font-size:12.5px;color:var(--mut2);margin:12px 2px 0;line-height:1.5}
+  .figcap b{color:var(--mut)}
+
+  /* ---- generic section ---- */
+  .sec{margin-top:46px;scroll-margin-top:72px}
+  .sec h3{font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;color:var(--mut);
+    margin:0 0 18px;display:flex;align-items:center;gap:12px}
+  .sec h3::before{content:"";width:18px;height:2px;background:linear-gradient(90deg,var(--e1),var(--e2))}
+  .prose{font-size:15.5px;color:#cdd6e1;max-width:74ch}
+  .prose b{color:var(--tx);font-weight:600}
+
+  /* ---- findings ---- */
+  .finds{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:720px){.finds{grid-template-columns:1fr}}
+  .find{border:1px solid var(--line);border-radius:12px;background:var(--surf2);padding:20px;transition:.18s}
+  .find:hover{border-color:var(--line2);transform:translateY(-2px)}
+  .find .ix{font-family:var(--mono);font-size:12px;color:var(--e2);font-weight:700;margin-bottom:10px}
+  .find h4{font-family:var(--disp);font-size:16px;font-weight:600;margin:0 0 8px;color:var(--tx);line-height:1.25}
+  .find p{font-size:13.5px;color:var(--mut);margin:0;line-height:1.55}
+
+  /* ---- results table ---- */
+  .tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .tbl th,.tbl td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--line)}
+  .tbl th:first-child,.tbl td:first-child{text-align:left}
+  .tbl thead th{background:var(--bg2);color:var(--mut);font-weight:600;font-size:11.5px;letter-spacing:.4px}
+  .tbl tbody tr:hover{background:#141a23}
+  .tbl .grp{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px;vertical-align:middle}
+  .g0{background:#5b9bff}.g1{background:var(--e2)}.g2{background:#3fcf8e}.g3{background:#ff6b6b}
+  .tbl .d{color:var(--e3);font-weight:700}
+  .tbl tfoot td{background:linear-gradient(90deg,rgba(255,90,50,.08),rgba(255,157,47,.05));font-weight:700;color:var(--tx);border-bottom:none}
+  .grpkey{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--mut);font-family:var(--mono);margin:14px 2px 0}
+  .grpkey span{display:flex;align-items:center}
+
+  /* ---- method steps ---- */
+  .flow{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap}
+  .step{flex:1;min-width:150px;border:1px solid var(--line);border-radius:11px;background:var(--surf2);padding:16px}
+  .step .t{font-family:var(--mono);font-size:11px;color:var(--mut2);margin-bottom:7px}
+  .step .h{font-family:var(--disp);font-weight:600;font-size:14.5px;color:var(--tx);margin-bottom:6px}
+  .step.frozen .h::after{content:"❄ frozen";font-family:var(--mono);font-size:9.5px;color:var(--cy);background:rgba(87,209,230,.1);
+    border:1px solid rgba(87,209,230,.25);border-radius:5px;padding:1px 6px;margin-left:8px;font-weight:500}
+  .step.learn .h::after{content:"⟲ learned";font-family:var(--mono);font-size:9.5px;color:var(--e3);background:rgba(255,210,74,.1);
+    border:1px solid rgba(255,210,74,.3);border-radius:5px;padding:1px 6px;margin-left:8px;font-weight:500}
+  .step p{font-size:12.5px;color:var(--mut);margin:0;line-height:1.5}
+
+  /* ---- bibtex ---- */
+  .code{position:relative;border:1px solid var(--line);border-radius:12px;background:#0c0f15;overflow:hidden}
+  .code .hd{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--line);background:var(--bg2)}
+  .code .fn{font-family:var(--mono);font-size:12px;color:var(--mut)}
+  .copy{font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--mut);border:1px solid var(--line2);background:var(--surf2);
+    border-radius:6px;padding:4px 10px;cursor:pointer;transition:.15s}
+  .copy:hover{color:var(--tx);border-color:#42505f}
+  .copy.ok{color:#3fcf8e;border-color:#2c5}
+  pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.65;color:#c6d0db}
+  pre .k{color:var(--e2)}pre .s{color:#9fe6b8}
+
+  footer{border-top:1px solid var(--line);margin-top:30px;padding:24px 0 60px;color:var(--mut2);font-size:12.5px;
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;font-family:var(--mono)}
+  footer a:hover{color:var(--tx)}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.draw{stroke-dashoffset:0!important}}
+</style>
+</head>
+<body>
+
+<div class="top"><div class="wrap">
+  <svg class="mark" viewBox="0 0 24 24" fill="var(--mut)" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-1.8c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11 11 0 0 1 6 0C17.3 5 18.3 5.3 18.3 5.3c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5A11.5 11.5 0 0 0 23.5 12C23.5 5.7 18.3.5 12 .5z"/></svg>
+  <div class="repo"><b>yeoncham</b><span class="sl">/</span><b>Kernel-Adaptive-HQS</b></div>
+  <div class="spacer"></div>
+  <a class="pill" href="https://github.com/yeoncham/Kernel-Adaptive-HQS" target="_blank" rel="noopener"><span class="star">★</span> Star<span class="ct">—</span></a>
+</div></div>
+
+<div class="wrap">
+
+  <div class="rhead">
+    <h1 class="path"><b>Kernel-Adaptive-HQS</b></h1>
+    <p class="desc">The optimal Half-Quadratic Splitting schedule isn't universal. Freeze the denoiser, learn only the 24 scalars of the
+      <span style="color:var(--cy)">σ</span>/<span style="color:var(--e2)">μ</span> trajectory per blur kernel — and the schedule the optimizer invents reveals the structure of the degradation.</p>
+    <div class="topics">
+      <span class="topic">image-restoration</span><span class="topic">plug-and-play</span>
+      <span class="topic">half-quadratic-splitting</span><span class="topic">deblurring</span>
+      <span class="topic">deep-unrolling</span><span class="topic">drunet</span>
+    </div>
+    <div class="badges">
+      <span class="badge"><span class="k">status</span><span class="v">Preprint</span></span>
+      <span class="badge"><span class="k">task</span><span class="v">non-blind deblurring</span></span>
+      <span class="badge"><span class="k">kernels</span><span class="v">12</span></span>
+      <span class="badge"><span class="k">avg ΔPSNR</span><span class="v em">+0.12 dB</span></span>
+      <span class="badge"><span class="k">framework</span><span class="v">PyTorch</span></span>
+    </div>
+
+    <nav class="tabs" id="tabs">
+      <a class="tab on" href="#readme">⌘ Overview</a>
+      <a class="tab" href="#findings">Findings<span class="n">3</span></a>
+      <a class="tab" href="#trajectories">Trajectories</a>
+      <a class="tab" href="#results">Results<span class="n">12</span></a>
+      <a class="tab" href="#method">Method</a>
+      <a class="tab" href="#cite">Cite</a>
+    </nav>
+  </div>
+
+  <article class="readme" id="readme">
+    <div class="readme-bar"><span class="dot"></span> README.md</div>
+    <div class="readme-body">
+
+      <p class="eyebrow">Plug-and-Play · HQS · Kernel-adaptive scheduling</p>
+      <h2 class="title">How Blur Kernels Shape Optimal&nbsp;HQS Trajectories in Plug-and-Play Image Restoration</h2>
+      <p class="authors"><b>Jongmin Kim</b> &nbsp;·&nbsp; <b>Jaehyeok Choi</b></p>
+      <p class="affil">Soongsil University, Seoul &nbsp;·&nbsp; <span class="venue">Preprint</span></p>
+
+      <div class="cta">
+        <a class="btn prime" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 21V5a2 2 0 0 1 2-2h8l4 4v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/></svg> Paper (PDF)</a>
+        <a class="btn" href="https://github.com/yeoncham/Kernel-Adaptive-HQS" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-1.8c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11 11 0 0 1 6 0C17.3 5 18.3 5.3 18.3 5.3c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5A11.5 11.5 0 0 0 23.5 12C23.5 5.7 18.3.5 12 .5z"/></svg> Code</a>
+        <a class="btn" href="#cite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h7M7 11h10M7 15h5"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg> BibTeX</a>
+      </div>
+
+      <div class="fig">
+        <svg id="chart" viewBox="0 0 760 300" role="img" aria-label="Learned class-averaged sigma schedules versus the hand-crafted baseline"></svg>
+        <div class="leg">
+          <span><i style="border-top-color:#5d6b7c;border-top-style:dashed"></i>Baseline (Hand-crafted)</span>
+          <span><i style="border-top-color:#1f77b4;border-top-style:solid"></i>Gaussian-small</span>
+          <span><i style="border-top-color:#ff7f0e;border-top-style:solid"></i>Gaussian-large</span>
+          <span><i style="border-top-color:#2ca02c;border-top-style:solid"></i>Non-Gaussian (Open-loop)</span>
+          <span><i style="border-top-color:#d62728;border-top-style:solid"></i>Non-Gaussian (Closed-loop)</span>
+        </div>
+        <p class="figcap"><b>Group-averaged parameter trajectories.</b> With the denoiser frozen, HQS schedules are optimized end-to-end. While Gaussian-small tracks the hand-crafted baseline closely, Gaussian-large holds a high noise level longer. Most distinctively, open-loop blur schedules exhibit a non-monotonic <i>dip-then-plateau</i> shape, keeping the denoiser's prior strong through the middle stages to suppress structured motion artifacts.</p>
+      </div>
+
+      <section class="sec" id="abstract">
+        <h3>Abstract</h3>
+        <p class="prose">We study how the optimal trajectories of the penalty parameter <b>μ<sub>k</sub></b> and denoiser noise level <b>σ<sub>k</sub></b> — the core hyperparameters of HQS-based Plug-and-Play restoration — change with the blur kernel. Existing methods apply one hand-crafted schedule to every input. We instead <b>freeze a pretrained DRUNet entirely</b> and expose only the 24 schedule scalars (μ and σ over 12 iterations) as learnable parameters, trained end-to-end by differentiable unrolling, independently for each of 12 kernels. Because the denoiser never changes, every performance difference is attributable to the schedule alone. The learned trajectories diverge from the hand-crafted baseline into patterns governed by the kernel's <b>shape</b> (Gaussian vs. non-Gaussian), <b>scale</b>, and the <b>topology</b> of the motion path (open- vs. closed-loop), and yield an average <b>+0.12 dB</b> on Set3C — evidence that the HQS schedule is an interpretable, actionable degree of freedom, not a fixed convention.</p>
+      </section>
+
+      <section class="sec" id="findings">
+        <h3>Key findings</h3>
+        <div class="finds">
+          <div class="find"><div class="ix">01</div><h4>The schedule is a lever, isolated</h4><p>Freezing DRUNet removes representational capacity as a confound. Any gain comes purely from the (μ, σ) schedule — measured, not assumed.</p></div>
+          <div class="find"><div class="ix">02</div><h4>Structure → trajectory</h4><p>Gaussian-small tracks the baseline; Gaussian-large holds σ high early; open-loop motion invents a non-monotonic dip-then-plateau. The kernel's geometry is legible in the schedule.</p></div>
+          <div class="find"><div class="ix">03</div><h4>Divergence predicts gain</h4><p>The kernels whose learned σ departs most from the baseline — Gaussian-large and open-loop — also gain the most PSNR. The headroom lives where the one-size schedule fits worst.</p></div>
+        </div>
+      </section>
+
+      <section class="sec" id="trajectories">
+        <h3>What the open-loop kernel does</h3>
+        <p class="prose">For an open-loop kernel (energy spread along a curved, non-closing path), the optimizer keeps the <b>prior strong through the middle iterations</b>: both σ and μ rise above the baseline together rather than trading off. The cost is temporary — intermediate iterations sit <i>below</i> the baseline in PSNR — but the final reconstruction wins, because the strong mid-stage prior suppresses structured artifacts that would be hard to remove later. A useful caution falls out of this: <b>intermediate-iteration quality is not a proxy for final quality</b> when comparing PnP-HQS schedules.</p>
+      </section>
+
+      <section class="sec" id="results">
+        <h3>Set3C results · per-kernel PSNR</h3>
+        <table class="tbl">
+          <thead><tr><th>Kernel</th><th>Baseline</th><th>Ours</th><th>Δ</th></tr></thead>
+          <tbody id="rows"></tbody>
+          <tfoot><tr><td>Average</td><td>28.27</td><td>28.39</td><td class="d">+0.12</td></tr></tfoot>
+        </table>
+        <div class="grpkey">
+          <span><i class="grp g0"></i>Gaussian-small (00–02)</span>
+          <span><i class="grp g1"></i>Gaussian-large (03–07)</span>
+          <span><i class="grp g2"></i>Open-loop (08, 10)</span>
+          <span><i class="grp g3"></i>Closed-loop (09, 11)</span>
+        </div>
+      </section>
+
+      <section class="sec" id="method">
+        <h3>Method · differentiable unrolling</h3>
+        <div class="flow">
+          <div class="step"><div class="t">input</div><div class="h">y = k ⊛ x + n</div><p>Degraded image synthesized on autograd with circular padding.</p></div>
+          <div class="step learn"><div class="t">step 1 · data</div><div class="h">Data term</div><p>FFT closed-form solution; penalty coefficient set by the learnable schedule.</p></div>
+          <div class="step frozen"><div class="t">step 2 · prior</div><div class="h">DRUNet</div><p>Pretrained color denoiser, all weights <code>requires_grad=False</code>; takes σ<sub>k</sub> as a noise-level map.</p></div>
+          <div class="step learn"><div class="t">×12 iters</div><div class="h">log μ, log σ</div><p>24 scalars in log-space, clamped positive, Adam + cosine, MSE on the final output.</p></div>
+        </div>
+      </section>
+
+      <section class="sec" id="cite">
+        <h3>Citation</h3>
+        <div class="code">
+          <div class="hd"><span class="fn">citation.bib</span><button class="copy" id="cbtn">Copy</button></div>
+<pre id="bib"><span class="k">@article</span>{kim2026how,
+  title   = {<span class="s">How Blur Kernels Shape Optimal HQS Trajectories in Plug-and-Play Image Restoration</span>},
+  author  = {<span class="s">Kim, Jongmin and Choi, Jaehyeok</span>},
+  journal = {<span class="s">arXiv preprint</span>},
+  year    = {<span class="s">2026</span>}
+}</pre>
+        </div>
+      </section>
+
+    </div>
+  </article>
+
+  <footer>
+    <span>© 2026 Jongmin Kim · Jaehyeok Choi — Soongsil University</span>
+    <span>Built on DPIR · DRUNet · DIV2K</span>
+  </footer>
+</div>
+
+<script>
+// ---- real Set3C numbers ----
+const data=[
+ [0,'00',34.56,34.56,'+0.00',0],[1,'01',29.93,30.04,'+0.12',0],[2,'02',27.90,27.98,'+0.08',0],
+ [3,'03',26.29,26.42,'+0.13',1],[4,'04',25.90,26.05,'+0.16',1],[5,'05',25.50,25.68,'+0.18',1],
+ [6,'06',26.13,26.27,'+0.14',1],[7,'07',24.75,24.90,'+0.16',1],[8,'08',29.72,29.89,'+0.17',2],
+ [9,'09',30.19,30.26,'+0.07',3],[10,'10',29.69,29.79,'+0.10',2],[11,'11',28.74,28.82,'+0.08',3]];
+const rows=document.getElementById('rows');
+data.forEach(d=>{const tr=document.createElement('tr');
+  tr.innerHTML=`<td><span class="grp g${d[5]}"></span>Kernel ${d[1]}</td><td>${d[2].toFixed(2)}</td><td>${d[3].toFixed(2)}</td><td class="d">${d[4]}</td>`;
+  rows.appendChild(tr);});
+
+// ---- hero chart (real σ×255 trajectories) ----
+const base = [49,41.4,35,29.5,24.9,21.1,17.8,15,12.7,10.7,9.1,7.6];
+const g_small = [49.44, 42.39, 34.30, 28.65, 24.22, 20.58, 17.82, 15.75, 13.93, 11.90, 9.06, 6.68];
+const g_large = [50.00, 50.00, 43.46, 33.26, 26.74, 22.33, 18.88, 15.89, 13.07, 10.38, 8.05, 6.14];
+const g_open = [48.41, 38.52, 31.52, 29.99, 30.30, 28.41, 24.69, 20.00, 13.67, 10.43, 8.59, 6.43];
+const g_closed = [47.26, 42.69, 37.49, 32.46, 28.16, 24.00, 20.02, 16.21, 13.32, 10.78, 8.46, 6.45];
+
+const W=760,H=300,mL=46,mR=16,mT=18,mB=34, iw=W-mL-mR, ih=H-mT-mB;
+const X=i=>mL+iw*i/11, Y=v=>mT+ih*(1-v/52);
+const path=a=>a.map((v,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1)).join(' ');
+
+let g='';
+// grid + y labels
+[0,10,20,30,40,50].forEach(v=>{
+  g+=`<line x1="${mL}" y1="${Y(v)}" x2="${W-mR}" y2="${Y(v)}" stroke="#1b2230" stroke-width="1"/>`+
+    `<text x="${mL-8}" y="${Y(v)+4}" fill="#5a6675" font-size="11" font-family="JetBrains Mono" text-anchor="end">${v}</text>`;
+});
+[1,3,5,7,9,11].forEach(i=>g+=`<text x="${X(i)}" y="${H-12}" fill="#5a6675" font-size="11" font-family="JetBrains Mono" text-anchor="middle">${i+1}</text>`);
+g+=`<text x="${mL-8}" y="14" fill="#7a8696" font-size="10.5" font-family="JetBrains Mono" text-anchor="end">σ×255</text>`;
+g+=`<text x="${(mL+W-mR)/2}" y="${H-1}" fill="#5a6675" font-size="10.5" font-family="JetBrains Mono" text-anchor="middle">HQS iteration k</text>`;
+
+// baseline (dashed)
+g+=`<path d="${path(base)}" fill="none" stroke="#5d6b7c" stroke-width="2" stroke-dasharray="5 5"/>`;
+
+// Draw each group
+const groups_traj = [
+  { name: 'small', data: g_small, color: '#1f77b4' },
+  { name: 'large', data: g_large, color: '#ff7f0e' },
+  { name: 'open', data: g_open, color: '#2ca02c' },
+  { name: 'closed', data: g_closed, color: '#d62728' }
+];
+
+groups_traj.forEach(gt => {
+  g+=`<path class="draw" d="${path(gt.data)}" fill="none" stroke="${gt.color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+  gt.data.forEach((v,i)=> {
+    g+=`<circle cx="${X(i)}" cy="${Y(v)}" r="2.8" fill="#0a0c11" stroke="${gt.color}" stroke-width="1.8"/>`;
+  });
+});
+
+const svg=document.getElementById('chart'); svg.innerHTML=g;
+
+// draw-in animation for all 4 paths
+const drawPaths = svg.querySelectorAll('.draw');
+drawPaths.forEach(ln => {
+  if(ln && !matchMedia('(prefers-reduced-motion:reduce)').matches){
+    const L=ln.getTotalLength(); ln.style.strokeDasharray=L; ln.style.strokeDashoffset=L;
+    new IntersectionObserver((e,o)=>{
+      if(e[0].isIntersecting){
+        ln.style.transition='stroke-dashoffset 1.4s cubic-bezier(.4,0,.1,1)';
+        ln.style.strokeDashoffset=0;
+        o.disconnect();
+      }
+    },{threshold:.4}).observe(svg);
+  }
+});
+
+// ---- copy bibtex ----
+const cb=document.getElementById('cbtn');
+cb.addEventListener('click',()=>{navigator.clipboard.writeText(document.getElementById('bib').innerText).then(()=>{cb.textContent='Copied ✓';cb.classList.add('ok');setTimeout(()=>{cb.textContent='Copy';cb.classList.remove('ok');},1600);});});
+
+// ---- scrollspy tabs ----
+const tabs=[...document.querySelectorAll('.tab')];
+const secs=tabs.map(t=>document.querySelector(t.getAttribute('href'))).filter(Boolean);
+new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){const id='#'+e.target.id;
+  tabs.forEach(t=>t.classList.toggle('on',t.getAttribute('href')===id));}});},{rootMargin:'-45% 0px -50% 0px'}).observe?.(null);
+const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){const id='#'+e.target.id;
+  tabs.forEach(t=>t.classList.toggle('on',t.getAttribute('href')===id));}});},{rootMargin:'-45% 0px -50% 0px'});
+secs.forEach(s=>io.observe(s));
+</script>
+</body>
+</html>
