@@ -1,9 +1,10 @@
 # How Blur Kernels Shape Optimal HQS Trajectories in Plug-and-Play Image Restoration
 
+[![Project Page](https://img.shields.io/badge/Project-Page-blue.svg)](https://yeoncham.github.io/Kernel-Adaptive-HQS/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-orange.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Official PyTorch implementation of the paper: **"How Blur Kernels Shape Optimal HQS Trajectories in Plug-and-Play Image Restoration"**.
+Official PyTorch implementation of the paper: **"How Blur Kernels Shape Optimal HQS Trajectories in Plug-and-Play Image Restoration"** | [**Project Page**](https://yeoncham.github.io/Kernel-Adaptive-HQS/).
 
 ---
 
