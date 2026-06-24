@@ -30,7 +30,7 @@ In this work, we **freeze the weights of the pre-trained deep denoiser (DRUNet) 
 │   ├── network_unet.py          # DRUNet Architecture
 │   └── basicblock.py            # Neural network blocks & operations
 ├── utils/
-│   ├── utils_image.py           # Image handling & metric calculation (PSNR/SSIM)
+│   ├── utils_image.py           # Image handling & metric calculation (PSNR)
 │   ├── utils_sisr.py            # Closed-form data solution in FFT domain
 │   ├── utils_model.py           # Model loading & evaluation modes
 │   └── utils_pnp.py             # Baseline hand-crafted schedule generation
